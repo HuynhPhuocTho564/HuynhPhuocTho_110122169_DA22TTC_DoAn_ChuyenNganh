@@ -5,6 +5,7 @@ const FileUpload = ({
   accept = '*',
   multiple = false,
   maxSize = 5 * 1024 * 1024, // 5MB
+  maxFiles = 5, // Tối đa 5 file
   onFilesSelected,
   label = 'Chọn file',
   description = 'Kéo thả file hoặc click để chọn'
@@ -24,6 +25,12 @@ const FileUpload = ({
   const handleFiles = (selectedFiles) => {
     setError('');
     const fileArray = Array.from(selectedFiles);
+    
+    // Kiểm tra số lượng file
+    if (multiple && fileArray.length > maxFiles) {
+      setError(`Chỉ được upload tối đa ${maxFiles} file`);
+      return;
+    }
     
     // Validate files
     for (const file of fileArray) {

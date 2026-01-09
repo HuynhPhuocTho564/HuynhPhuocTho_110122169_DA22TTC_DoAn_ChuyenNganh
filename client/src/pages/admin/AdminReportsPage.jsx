@@ -67,21 +67,48 @@ const AdminReportsPage = () => {
       setExporting(true);
       toast.info('Đang xuất danh sách giải ngân...');
       
-      const response = await api.get('/applications/export-disbursement', { responseType: 'blob' });
+      // Truyền filter năm học và học kỳ
+      const params = new URLSearchParams();
+      if (filters.academic_year) params.append('academic_year', filters.academic_year);
+      if (filters.semester) params.append('semester', filters.semester);
+      
+      const response = await api.get(`/applications/export-disbursement?${params.toString()}`, { 
+        responseType: 'arraybuffer'
+      });
+      
+      // Kiểm tra nếu response là JSON error (không phải Excel)
+      const contentType = response.headers['content-type'];
+      if (contentType && contentType.includes('application/json')) {
+        // Decode arraybuffer thành text để đọc error message
+        const decoder = new TextDecoder('utf-8');
+        const errorData = JSON.parse(decoder.decode(response.data));
+        toast.error(errorData.message || 'Có lỗi xảy ra');
+        return;
+      }
+      
+      // Tạo blob từ arraybuffer
       const blob = new Blob([response.data], { 
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
       });
+      
+      // Tạo URL và download
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `danh_sach_giai_ngan_${new Date().toISOString().split('T')[0]}.xlsx`;
+      const dateStr = new Date().toISOString().split('T')[0];
+      const periodStr = filters.academic_year ? `_${filters.academic_year.replace('-', '_')}${filters.semester ? `_HK${filters.semester}` : ''}` : '';
+      link.setAttribute('download', `danh_sach_giai_ngan${periodStr}_${dateStr}.xlsx`);
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(url);
+      
       toast.success('Xuất file thành công!');
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Không có hồ sơ đã duyệt để xuất');
+      console.error('Export error:', error);
+      // Error message đã được xử lý trong api interceptor
+      const errorMsg = error.message || 'Không có hồ sơ đã duyệt để xuất';
+      toast.error(errorMsg);
     } finally {
       setExporting(false);
     }

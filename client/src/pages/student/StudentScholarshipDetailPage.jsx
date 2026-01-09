@@ -183,6 +183,31 @@ const StudentScholarshipDetailPage = () => {
             </div>
           </div>
 
+          {/* Kiểm tra thông tin ngân hàng */}
+          {(!user?.bank_name || !user?.bank_number) ? (
+            <div className="bg-red-50 border border-red-300 rounded-lg p-4">
+              <p className="text-red-800 font-bold mb-2">
+                ❌ Thiếu thông tin ngân hàng!
+              </p>
+              <p className="text-red-700 text-sm mb-3">
+                Bạn cần cập nhật thông tin ngân hàng (Tên ngân hàng và Số tài khoản) để có thể nhận tiền học bổng.
+              </p>
+              <Button 
+                variant="danger" 
+                size="sm" 
+                onClick={() => { setShowApplyModal(false); navigate('/student/profile'); }}
+              >
+                👉 Cập nhật ngay
+              </Button>
+            </div>
+          ) : (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-green-800 text-sm">
+                ✅ <strong>Thông tin ngân hàng:</strong> {user.bank_name} - {user.bank_number}
+              </p>
+            </div>
+          )}
+
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <p className="text-yellow-800 text-sm">
               ⚠️ <strong>Lưu ý:</strong> Thông tin sẽ được "đóng băng" tại thời điểm nộp. 
@@ -205,7 +230,12 @@ const StudentScholarshipDetailPage = () => {
 
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button variant="outline" onClick={() => setShowApplyModal(false)}>Hủy</Button>
-            <Button variant="primary" onClick={handleApply} loading={submitting}>
+            <Button 
+              variant="primary" 
+              onClick={handleApply} 
+              loading={submitting}
+              disabled={!user?.bank_name || !user?.bank_number}
+            >
               Xác nhận nộp hồ sơ
             </Button>
           </div>

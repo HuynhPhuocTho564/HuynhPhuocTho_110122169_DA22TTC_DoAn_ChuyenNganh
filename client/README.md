@@ -92,7 +92,8 @@ npm install
 ```
 
 ### 2. Chạy development server
-```bash
+```
+bash
 npm run dev
 ```
 

@@ -74,9 +74,9 @@ const SystemDashboardPage = () => {
       const monthlyUsers = months.map((_, i) => Math.floor(baseValue * (i + 1) * (0.8 + Math.random() * 0.4)));
 
       setChartData({
-        // Biểu đồ phân bố sinh viên theo trường
+        // Biểu đồ phân bố sinh viên theo trường - dùng tên đầy đủ
         studentsBySchool: {
-          labels: topSchools.map(s => s.code || s.name?.substring(0, 10)),
+          labels: topSchools.map(s => s.name || s.code),
           datasets: [{
             label: 'Số sinh viên',
             data: topSchools.map(s => s.student_count || 0),
@@ -113,9 +113,9 @@ const SystemDashboardPage = () => {
             pointRadius: 5,
           }]
         },
-        // Biểu đồ học bổng theo trường
+        // Biểu đồ học bổng theo trường - dùng tên đầy đủ
         scholarshipsBySchool: {
-          labels: topSchools.map(s => s.code || s.name?.substring(0, 10)),
+          labels: topSchools.map(s => s.name || s.code),
           datasets: [{
             label: 'Số học bổng',
             data: topSchools.map(s => s.scholarship_count || Math.floor(Math.random() * 10) + 1),
@@ -136,7 +136,7 @@ const SystemDashboardPage = () => {
     responsive: true, 
     maintainAspectRatio: false, 
     plugins: { 
-      legend: { position: 'bottom', labels: { padding: 15, usePointStyle: true } } 
+      legend: { position: 'bottom', labels: { padding: 15, usePointStyle: true } }
     } 
   };
 

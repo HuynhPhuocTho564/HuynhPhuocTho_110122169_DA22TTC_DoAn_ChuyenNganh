@@ -49,6 +49,8 @@ import SystemUsersPage from './pages/system/SystemUsersPage';
 import SystemDashboardPage from './pages/system/SystemDashboardPage';
 import SystemReportsPage from './pages/system/SystemReportsPage';
 import SystemSponsorsPage from './pages/system/SystemSponsorsPage';
+import SystemAuditLogsPage from './pages/system/SystemAuditLogsPage';
+import SystemBackupPage from './pages/system/SystemBackupPage';
 
 // Common Pages
 import ProfilePage from './pages/ProfilePage';
@@ -281,6 +283,16 @@ function App() {
         <Route path="/system/sponsors" element={
           <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
             <SystemSponsorsPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/system/audit-logs" element={
+          <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+            <SystemAuditLogsPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/system/backup" element={
+          <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+            <SystemBackupPage />
           </ProtectedRoute>
         } />
 

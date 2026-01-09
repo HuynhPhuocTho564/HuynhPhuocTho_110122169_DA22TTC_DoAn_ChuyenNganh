@@ -7,16 +7,16 @@ export default {
   theme: {
     extend: {
       fontSize: {
-        // Base sizes +2px từ chuẩn UX
-        'xs': ['14px', { lineHeight: '1.5' }],      // 12px + 2px
-        'sm': ['16px', { lineHeight: '1.5' }],      // 14px + 2px (label/caption)
-        'base': ['18px', { lineHeight: '1.6' }],    // 16px + 2px (body text)
-        'lg': ['20px', { lineHeight: '1.6' }],      // 18px + 2px
-        'xl': ['24px', { lineHeight: '1.5' }],      // 20px + 4px (heading h4)
-        '2xl': ['28px', { lineHeight: '1.4' }],     // 24px + 4px (heading h3)
-        '3xl': ['34px', { lineHeight: '1.3' }],     // 30px + 4px (heading h2)
-        '4xl': ['40px', { lineHeight: '1.2' }],     // 36px + 4px (heading h1)
-        '5xl': ['52px', { lineHeight: '1.1' }],     // 48px + 4px
+        // Kích thước chuẩn UX - gọn gàng hơn
+        'xs': ['11px', { lineHeight: '1.5' }],      // extra small
+        'sm': ['13px', { lineHeight: '1.5' }],      // small (label/caption)
+        'base': ['14px', { lineHeight: '1.6' }],    // body text
+        'lg': ['16px', { lineHeight: '1.6' }],      // large
+        'xl': ['18px', { lineHeight: '1.5' }],      // heading h4
+        '2xl': ['22px', { lineHeight: '1.4' }],     // heading h3
+        '3xl': ['28px', { lineHeight: '1.3' }],     // heading h2
+        '4xl': ['34px', { lineHeight: '1.2' }],     // heading h1
+        '5xl': ['44px', { lineHeight: '1.1' }],     // display
       },
       colors: {
         primary: {

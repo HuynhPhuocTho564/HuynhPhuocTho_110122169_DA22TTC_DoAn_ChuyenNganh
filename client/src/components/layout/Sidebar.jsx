@@ -15,6 +15,8 @@ const Sidebar = () => {
       { icon: '👨‍🎓', label: 'Quản lý Sinh viên', path: '/system/users' },
       { icon: '💼', label: 'Quản lý Nhà tài trợ', path: '/system/sponsors' },
       { icon: '📈', label: 'Báo cáo', path: '/system/reports' },
+      { icon: '📋', label: 'Nhật ký Hệ thống', path: '/system/audit-logs' },
+      { icon: '💾', label: 'Sao lưu Database', path: '/system/backup' },
     ],
     UNI_ADMIN: [
       { icon: '📊', label: 'Dashboard', path: '/admin/dashboard' },
@@ -63,7 +65,7 @@ const Sidebar = () => {
 
   return (
     <div
-      className={`bg-gradient-to-b from-blue-900 to-blue-800 text-white h-screen fixed left-0 top-0 transition-all duration-300 ${
+      className={`bg-gradient-to-b from-blue-900 to-blue-800 text-white h-screen fixed left-0 top-0 transition-all duration-300 flex flex-col ${
         collapsed ? 'w-20' : 'w-64'
       } shadow-2xl z-40`}
     >
@@ -106,8 +108,8 @@ const Sidebar = () => {
         </div>
       )}
 
-      {/* Menu Items */}
-      <nav className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      {/* Menu Items - Flex grow để chiếm không gian còn lại */}
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {currentMenu.map((item, index) => {
           if (item.type === 'divider') {
             return !collapsed ? (
@@ -136,9 +138,9 @@ const Sidebar = () => {
         })}
       </nav>
 
-      {/* Quick Links */}
+      {/* Quick Links - Không dùng absolute nữa */}
       {!collapsed && (
-        <div className="absolute bottom-24 left-0 right-0 px-4 space-y-1">
+        <div className="px-4 py-2 space-y-1 border-t border-blue-700">
           <Link
             to="/profile"
             className="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-blue-700 transition"
@@ -158,7 +160,7 @@ const Sidebar = () => {
 
       {/* Footer */}
       {!collapsed && (
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-blue-700 bg-blue-900">
+        <div className="p-4 border-t border-blue-700 bg-blue-900">
           <p className="text-xs text-blue-300 text-center">© 2024 Scholarship System</p>
           <p className="text-xs text-blue-400 text-center mt-1">Hệ thống Quản lý Học bổng</p>
         </div>

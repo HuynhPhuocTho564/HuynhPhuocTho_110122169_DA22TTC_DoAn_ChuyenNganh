@@ -57,6 +57,23 @@ const StudentProfilePage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate số tài khoản ngân hàng
+    if (formData.bank_number) {
+      // Chỉ cho phép số, độ dài 8-20 ký tự
+      const bankNumberRegex = /^[0-9]{8,20}$/;
+      if (!bankNumberRegex.test(formData.bank_number)) {
+        toast.error('Số tài khoản không hợp lệ! Chỉ được nhập số, từ 8-20 chữ số.');
+        return;
+      }
+    }
+    
+    // Validate: Nếu có số TK thì phải có tên ngân hàng và ngược lại
+    if ((formData.bank_number && !formData.bank_name) || (!formData.bank_number && formData.bank_name)) {
+      toast.error('Vui lòng nhập đầy đủ cả Tên ngân hàng và Số tài khoản');
+      return;
+    }
+
     try {
       setSaving(true);
       const response = await api.put('/users/profile', formData);
@@ -160,9 +177,17 @@ const StudentProfilePage = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Số tài khoản</label>
-                  <input type="text" name="bank_number" value={formData.bank_number} onChange={handleChange}
-                    disabled={!editing} placeholder="VD: 1234567890"
+                  <input type="text" name="bank_number" value={formData.bank_number} 
+                    onChange={(e) => {
+                      // Chỉ cho phép nhập số
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      setFormData({ ...formData, bank_number: value });
+                    }}
+                    disabled={!editing} placeholder="VD: 1234567890" maxLength={20}
                     className="w-full px-4 py-2 border rounded-lg disabled:bg-gray-100" />
+                  {formData.bank_number && (formData.bank_number.length < 8 || formData.bank_number.length > 20) && (
+                    <p className="text-xs text-red-500 mt-1">Số tài khoản phải từ 8-20 chữ số</p>
+                  )}
                 </div>
               </div>
             </div>
