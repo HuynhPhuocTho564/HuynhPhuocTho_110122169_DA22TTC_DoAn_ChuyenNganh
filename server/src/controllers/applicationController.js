@@ -2,6 +2,7 @@ const applicationService = require('../services/applicationService');
 const { ApplicationDocument, Application, Student, StudentDocument, Scholarship, Class } = require('../models');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 const ExcelJS = require('exceljs');
+const auditService = require('../services/auditService');
 
 // POST /api/applications - Nộp hồ sơ (STUDENT)
 const submitApplication = async (req, res) => {
@@ -151,6 +152,14 @@ const reviewApplication = async (req, res) => {
       return errorResponse(res, 'Vui lòng chọn trạng thái xét duyệt');
     }
 
+    // Lấy thông tin application trước khi review để ghi log
+    const appBefore = await Application.findByPk(id, {
+      include: [
+        { model: Student, as: 'student', attributes: ['full_name', 'student_code'] },
+        { model: Scholarship, as: 'scholarship', attributes: ['name'] }
+      ]
+    });
+
     const application = await applicationService.reviewApplication(
       id,
       { status, admin_note },
@@ -158,6 +167,18 @@ const reviewApplication = async (req, res) => {
       req.user.role,
       req.user.school_id
     );
+
+    // Ghi audit log
+    if (appBefore) {
+      const studentName = appBefore.student?.full_name || 'N/A';
+      const scholarshipName = appBefore.scholarship?.name || 'N/A';
+      
+      if (status === 'APPROVED') {
+        await auditService.logApprove(req, appBefore, scholarshipName, studentName);
+      } else if (status === 'REJECTED') {
+        await auditService.logReject(req, appBefore, scholarshipName, studentName, admin_note || 'Không có lý do');
+      }
+    }
 
     const statusMessages = {
       APPROVED: 'Đã duyệt hồ sơ thành công',
@@ -234,7 +255,7 @@ const copyDocumentsFromProfile = async (req, res) => {
 const exportDisbursementList = async (req, res) => {
   try {
     const { role, school_id } = req.user;
-    const { scholarship_id, status = 'APPROVED' } = req.query;
+    const { scholarship_id, status = 'APPROVED', academic_year, semester } = req.query;
 
     // Build where clause
     const whereClause = {
@@ -260,14 +281,24 @@ const exportDisbursementList = async (req, res) => {
       {
         model: Scholarship,
         as: 'scholarship',
-        attributes: ['id', 'name', 'amount_per_slot'],
-        required: true
+        attributes: ['id', 'name', 'amount_per_slot', 'academic_year', 'semester'],
+        required: true,
+        where: {}
       }
     ];
 
+    // Lọc theo năm học và học kỳ
+    if (academic_year) {
+      includeOptions[1].where.academic_year = academic_year;
+    }
+    if (semester) {
+      // Semester trong DB là "HK1", "HK2", "Cả năm" - frontend gửi "1" hoặc "2"
+      includeOptions[1].where.semester = `HK${semester}`;
+    }
+
     // Nếu là UNI_ADMIN, chỉ lấy hồ sơ của trường mình
     if (role === 'UNI_ADMIN' && school_id) {
-      includeOptions[1].where = { school_id };
+      includeOptions[1].where.school_id = school_id;
     }
 
     const applications = await Application.findAll({
@@ -277,7 +308,8 @@ const exportDisbursementList = async (req, res) => {
     });
 
     if (applications.length === 0) {
-      return errorResponse(res, 'Không có hồ sơ đã duyệt nào để xuất', 404);
+      const filterInfo = academic_year ? ` cho năm học ${academic_year}${semester ? ` HK${semester}` : ''}` : '';
+      return errorResponse(res, `Không có hồ sơ đã duyệt nào để xuất${filterInfo}`, 404);
     }
 
     // Tạo workbook với ExcelJS
@@ -285,9 +317,11 @@ const exportDisbursementList = async (req, res) => {
     workbook.creator = 'Scholarship System';
     workbook.created = new Date();
 
-    const worksheet = workbook.addWorksheet('Danh sách giải ngân');
+    // Tên sheet có thông tin năm học
+    const sheetName = academic_year ? `Giải ngân ${academic_year} HK${semester || ''}` : 'Danh sách giải ngân';
+    const worksheet = workbook.addWorksheet(sheetName.substring(0, 31)); // Excel giới hạn 31 ký tự
 
-    // Định nghĩa cột với header
+    // Định nghĩa cột với header - thêm cột Ghi chú
     worksheet.columns = [
       { header: 'STT', key: 'stt', width: 8 },
       { header: 'Mã SV', key: 'student_code', width: 15 },
@@ -297,7 +331,8 @@ const exportDisbursementList = async (req, res) => {
       { header: 'Số tiền', key: 'amount', width: 18 },
       { header: 'Ngân hàng', key: 'bank_name', width: 20 },
       { header: 'Số Tài khoản', key: 'bank_number', width: 20 },
-      { header: 'Nội dung CK', key: 'transfer_content', width: 35 }
+      { header: 'Nội dung CK', key: 'transfer_content', width: 35 },
+      { header: 'Ghi chú', key: 'note', width: 25 }
     ];
 
     // Format Header Row (Row 1)
@@ -310,6 +345,10 @@ const exportDisbursementList = async (req, res) => {
     };
     headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
     headerRow.height = 25;
+
+    // Đếm số SV thiếu thông tin ngân hàng và tính tổng tiền
+    let missingBankCount = 0;
+    let totalAmount = 0;
 
     // Đổ dữ liệu vào các dòng
     applications.forEach((app, index) => {
@@ -325,27 +364,47 @@ const exportDisbursementList = async (req, res) => {
       const amount = Number(scholarship.amount_per_slot) || 0;
       const scholarshipName = scholarship.name || '';
 
-      worksheet.addRow({
+      // Cộng dồn tổng tiền
+      totalAmount += amount;
+
+      // Kiểm tra thiếu thông tin ngân hàng
+      const missingBank = !bankName || !bankNumber;
+      if (missingBank) missingBankCount++;
+
+      const row = worksheet.addRow({
         stt: index + 1,
         student_code: studentCode,
         full_name: fullName,
         class_name: className,
         scholarship_name: scholarshipName,
         amount: amount,
-        bank_name: bankName,
-        bank_number: bankNumber,
-        transfer_content: `HB ${scholarshipName} - ${studentCode}`
+        bank_name: bankName || '⚠️ THIẾU',
+        bank_number: bankNumber || '⚠️ THIẾU',
+        transfer_content: `HB ${scholarshipName} - ${studentCode}`,
+        note: missingBank ? '❌ Thiếu TT ngân hàng' : '✓ OK'
       });
+
+      // Highlight dòng thiếu thông tin ngân hàng bằng màu đỏ nhạt
+      if (missingBank) {
+        const currentRow = worksheet.getRow(index + 2); // +2 vì header ở row 1
+        currentRow.eachCell((cell) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFECACA' } // Màu đỏ nhạt
+          };
+        });
+      }
     });
 
     // Format số tiền (cột F - index 6)
     worksheet.getColumn(6).numFmt = '#,##0';
     worksheet.getColumn(6).alignment = { horizontal: 'right' };
 
-    // Border cho tất cả cells có data
+    // Border cho tất cả cells có data (10 cột)
     const lastRow = applications.length + 1;
     for (let row = 1; row <= lastRow; row++) {
-      for (let col = 1; col <= 9; col++) {
+      for (let col = 1; col <= 10; col++) {
         const cell = worksheet.getCell(row, col);
         cell.border = {
           top: { style: 'thin' },
@@ -356,14 +415,56 @@ const exportDisbursementList = async (req, res) => {
       }
     }
 
-    // Set response headers
-    const fileName = `Danh_sach_giai_ngan_${new Date().toISOString().split('T')[0]}.xlsx`;
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    // Thêm dòng tổng kết ở cuối
+    const summaryRow = worksheet.addRow({});
+    summaryRow.getCell(1).value = `Tổng: ${applications.length} sinh viên`;
+    summaryRow.getCell(1).font = { bold: true };
+    
+    // Hiển thị tổng tiền ở cột F (Số tiền)
+    summaryRow.getCell(5).value = 'TỔNG TIỀN:';
+    summaryRow.getCell(5).font = { bold: true };
+    summaryRow.getCell(5).alignment = { horizontal: 'right' };
+    summaryRow.getCell(6).value = totalAmount;
+    summaryRow.getCell(6).numFmt = '#,##0';
+    summaryRow.getCell(6).font = { bold: true, color: { argb: 'FF1E40AF' } }; // Màu xanh đậm
+    summaryRow.getCell(6).alignment = { horizontal: 'right' };
+    
+    if (missingBankCount > 0) {
+      summaryRow.getCell(7).value = `⚠️ ${missingBankCount} SV thiếu TT ngân hàng`;
+      summaryRow.getCell(7).font = { bold: true, color: { argb: 'FFDC2626' } };
+    }
+    
+    // Border cho dòng tổng kết
+    for (let col = 1; col <= 10; col++) {
+      const cell = summaryRow.getCell(col);
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'double' },
+        right: { style: 'thin' }
+      };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF3F4F6' } // Màu xám nhạt
+      };
+    }
 
-    // Stream file về client
-    await workbook.xlsx.write(res);
-    res.end();
+    // Set response headers - tên file có thông tin năm học
+    const dateStr = new Date().toISOString().split('T')[0];
+    const periodStr = academic_year ? `_${academic_year.replace('-', '_')}${semester ? `_HK${semester}` : ''}` : '';
+    const fileName = `Danh_sach_giai_ngan${periodStr}_${dateStr}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+
+    // Tạo buffer và gửi về client (thay vì stream trực tiếp)
+    const buffer = await workbook.xlsx.writeBuffer();
+    
+    // Ghi audit log xuất báo cáo
+    const auditPeriodStr = academic_year ? `${academic_year}${semester ? ` HK${semester}` : ''}` : 'Tất cả';
+    await auditService.logExport(req, 'disbursement', `Xuất danh sách giải ngân ${auditPeriodStr} - ${applications.length} sinh viên`);
+    
+    res.send(buffer);
 
   } catch (error) {
     console.error('Export disbursement error:', error);

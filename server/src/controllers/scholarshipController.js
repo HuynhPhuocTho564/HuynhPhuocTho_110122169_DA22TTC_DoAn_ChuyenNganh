@@ -1,5 +1,7 @@
 const scholarshipService = require('../services/scholarshipService');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
+const auditService = require('../services/auditService');
+const { Scholarship } = require('../models');
 
 // POST /api/scholarships - Tạo học bổng mới
 const createScholarship = async (req, res) => {
@@ -19,6 +21,9 @@ const createScholarship = async (req, res) => {
       role,
       school_id
     );
+
+    // Ghi audit log
+    await auditService.logCreate(req, 'scholarship', scholarship, scholarship.name);
 
     return successResponse(res, scholarship, 'Tạo học bổng thành công', 201);
   } catch (error) {
@@ -66,12 +71,19 @@ const updateScholarship = async (req, res) => {
     const { id } = req.params;
     const { role, school_id } = req.user;
 
+    // Lấy dữ liệu cũ trước khi update
+    const oldScholarship = await Scholarship.findByPk(id);
+    const oldValues = oldScholarship ? oldScholarship.toJSON() : null;
+
     const scholarship = await scholarshipService.updateScholarship(
       id,
       req.body,
       role,
       school_id
     );
+
+    // Ghi audit log
+    await auditService.logUpdate(req, 'scholarship', id, scholarship.name, oldValues, req.body);
 
     return successResponse(res, scholarship, 'Cập nhật học bổng thành công');
   } catch (error) {
@@ -86,7 +98,15 @@ const deleteScholarship = async (req, res) => {
     const { id } = req.params;
     const { role, school_id } = req.user;
 
+    // Lấy dữ liệu trước khi xóa
+    const scholarship = await Scholarship.findByPk(id);
+    const oldValues = scholarship ? scholarship.toJSON() : null;
+    const scholarshipName = scholarship?.name || `ID: ${id}`;
+
     await scholarshipService.deleteScholarship(id, role, school_id);
+
+    // Ghi audit log
+    await auditService.logDelete(req, 'scholarship', id, scholarshipName, oldValues);
 
     return successResponse(res, null, 'Xóa học bổng thành công');
   } catch (error) {

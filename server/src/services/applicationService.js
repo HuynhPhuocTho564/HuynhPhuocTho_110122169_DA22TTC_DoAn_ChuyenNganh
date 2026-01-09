@@ -33,6 +33,11 @@ const submitApplication = async (scholarshipId, userId) => {
       throw new Error('Không tìm thấy thông tin sinh viên');
     }
 
+    // VALIDATION: Bắt buộc phải có thông tin ngân hàng để nhận tiền
+    if (!student.bank_name || !student.bank_number) {
+      throw new Error('Vui lòng cập nhật thông tin ngân hàng (Tên ngân hàng và Số tài khoản) trong hồ sơ cá nhân trước khi nộp đơn xin học bổng');
+    }
+
     // 2. Lấy thông tin học bổng với lock để tránh race condition
     const scholarship = await Scholarship.findByPk(scholarshipId, {
       lock: transaction.LOCK.UPDATE,
@@ -83,6 +88,35 @@ const submitApplication = async (scholarshipId, userId) => {
     const user = await User.findByPk(userId, { transaction });
     if (user.school_id !== scholarship.school_id) {
       throw new Error('Bạn chỉ có thể nộp hồ sơ cho học bổng của trường mình');
+    }
+
+    // 7.1 Kiểm tra SV đã nhận HB Khuyến khích học tập cùng kỳ chưa
+    // (Mỗi SV chỉ được nhận 1 HB Khuyến khích/kỳ)
+    const scholarshipName = scholarship.name.toLowerCase();
+    const isKhuyenKhich = scholarshipName.includes('khuyến khích') || scholarshipName.includes('khuyen khich');
+    
+    if (isKhuyenKhich) {
+      const existingKhuyenKhich = await Application.findOne({
+        where: {
+          student_id: student.id,
+          status: { [Op.in]: ['APPROVED', 'DISBURSED'] }
+        },
+        include: [{
+          model: Scholarship,
+          as: 'scholarship',
+          where: {
+            academic_year: scholarship.academic_year,
+            semester: scholarship.semester,
+            name: { [Op.like]: '%khuyến khích%' },
+            id: { [Op.ne]: scholarshipId } // Không tính chính HB đang nộp
+          }
+        }],
+        transaction
+      });
+
+      if (existingKhuyenKhich) {
+        throw new Error(`Bạn đã được duyệt học bổng Khuyến khích học tập trong ${scholarship.semester} năm ${scholarship.academic_year}. Mỗi sinh viên chỉ được nhận 1 học bổng Khuyến khích/kỳ.`);
+      }
     }
 
     // 8. SNAPSHOT DATA - Đóng băng dữ liệu tại thời điểm nộp
@@ -401,6 +435,12 @@ const reviewApplication = async (id, reviewData, reviewerId, reviewerRole, revie
 
     // Nếu APPROVED, kiểm tra còn suất không (với lock)
     if (status === 'APPROVED') {
+      // Kiểm tra thông tin ngân hàng trước khi duyệt
+      const snapshot = application.snapshot_data || {};
+      if (!snapshot.bank_name || !snapshot.bank_number) {
+        throw new Error('Sinh viên chưa cập nhật thông tin ngân hàng. Vui lòng chuyển sang trạng thái "Cần bổ sung" để yêu cầu sinh viên bổ sung thông tin.');
+      }
+
       const approvedCount = await Application.count({
         where: {
           scholarship_id: application.scholarship_id,

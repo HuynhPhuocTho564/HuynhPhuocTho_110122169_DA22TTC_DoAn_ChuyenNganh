@@ -13,6 +13,7 @@ const ApplicationDocument = require('./ApplicationDocument');
 const StudentDocument = require('./StudentDocument');
 const Notification = require('./Notification');
 const ActivityLog = require('./ActivityLog');
+const AuditLog = require('./AuditLog');
 
 // ============ ĐỊNH NGHĨA RELATIONSHIPS ============
 // Nguyên tắc: hasMany (1-N), belongsTo (N-1), belongsToMany (N-N)
@@ -76,6 +77,9 @@ Notification.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 // ActivityLog relationships
 ActivityLog.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
+// AuditLog relationships
+AuditLog.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
 // Export tất cả models
 module.exports = {
   User,
@@ -91,5 +95,6 @@ module.exports = {
   ApplicationDocument,
   StudentDocument,
   Notification,
-  ActivityLog
+  ActivityLog,
+  AuditLog
 };

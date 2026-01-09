@@ -1,6 +1,7 @@
 const authService = require('../services/authService');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 const { isValidEmail, isStrongPassword } = require('../utils/validation');
+const auditService = require('../services/auditService');
 
 // POST /api/auth/login - Đăng nhập
 const login = async (req, res) => {
@@ -14,9 +15,14 @@ const login = async (req, res) => {
 
     const { user, token } = await authService.login(identifier, password);
 
+    // Ghi audit log đăng nhập thành công
+    await auditService.logLogin(req, user);
+
     return successResponse(res, { user, token }, 'Đăng nhập thành công');
   } catch (error) {
     console.error('Login error:', error);
+    // Ghi audit log đăng nhập thất bại
+    await auditService.logLoginFailed(req, identifier, error.message);
     return errorResponse(res, error.message, 401);
   }
 };
@@ -53,6 +59,22 @@ const changePassword = async (req, res) => {
     }
 
     await authService.changePassword(req.user.id, oldPassword, newPassword);
+
+    // Ghi audit log đổi mật khẩu
+    const { ipAddress, userAgent } = auditService.getRequestInfo(req);
+    await auditService.logAction({
+      userId: req.user.id,
+      username: req.user.username,
+      userRole: req.user.role,
+      schoolId: req.user.school_id,
+      action: 'CHANGE_PASSWORD',
+      entityType: 'user',
+      entityId: req.user.id,
+      entityName: req.user.username,
+      description: 'Đổi mật khẩu thành công',
+      ipAddress,
+      userAgent
+    });
 
     return successResponse(res, null, 'Đổi mật khẩu thành công');
   } catch (error) {

@@ -28,14 +28,28 @@ const parseStudentExcel = (buffer) => {
         errors.push('Email không hợp lệ');
       }
       
-      // Validate GPA
-      if (row.gpa && (row.gpa < 0 || row.gpa > 4)) {
-        errors.push('GPA phải từ 0-4');
+      // Validate GPA (0-4.0)
+      const gpa = parseFloat(row.gpa);
+      if (row.gpa !== undefined && row.gpa !== null && row.gpa !== '') {
+        if (isNaN(gpa) || gpa < 0 || gpa > 4) {
+          errors.push('GPA phải là số từ 0-4.0');
+        }
       }
       
-      // Validate DRR
-      if (row.drr && (row.drr < 0 || row.drr > 100)) {
-        errors.push('Điểm rèn luyện phải từ 0-100');
+      // Validate DRR (0-100)
+      const drr = parseFloat(row.drr);
+      if (row.drr !== undefined && row.drr !== null && row.drr !== '') {
+        if (isNaN(drr) || drr < 0 || drr > 100) {
+          errors.push('Điểm rèn luyện phải là số từ 0-100');
+        }
+      }
+      
+      // Validate số tài khoản ngân hàng (nếu có)
+      if (row.bank_number) {
+        const bankNum = row.bank_number.toString().replace(/\D/g, '');
+        if (bankNum.length < 8 || bankNum.length > 20) {
+          errors.push('Số tài khoản phải từ 8-20 chữ số');
+        }
       }
       
       return {
